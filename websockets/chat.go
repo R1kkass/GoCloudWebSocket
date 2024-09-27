@@ -49,7 +49,7 @@ func (s *Server) SendMessages(ws *websocket.Conn, user *Model.User) {
 		} else {
 			jsonMessage, _ := json.Marshal(message)
 
-			s.broadcast([]byte(string(jsonMessage)), chatId)
+			s.broadcast(jsonMessage, chatId)
 		}
 	}
 }
@@ -67,8 +67,8 @@ func MiddlewareMessage(ws *websocket.Conn) (*Model.User, error) {
 
 	if err := CheckChat(ws.Request().URL.Query()["id"][0], user.ID); err != nil {
 		return nil, err
-	}
-
+	}	
+	
 	return user, nil
 }
 
@@ -99,12 +99,18 @@ func (s *Server) HandleChatWs(ws *websocket.Conn) {
 }
 
 func CheckChat(idChat string, userId uint) error {
-	var chat *Model.ChatUser
+	var chat []*Model.ChatUser
 
-	result := db.DB.Model(&Model.ChatUser{}).Where("chat_id = ? AND user_id = ?", idChat, userId).First(&chat)
+	result := db.DB.Model(&Model.ChatUser{}).Where("chat_id = ? AND user_id = ?", idChat, userId).Find(&chat)
 
 	if result.RowsAffected == 0 {
 		return errors.New("чат не найден")
+	}
+
+	for _, item := range chat {
+		if !item.SubmitCreate {
+			return errors.New("пользователи не подтверждены")
+		}
 	}
 
 	return nil
