@@ -21,7 +21,7 @@ func init() {
 
 func main() {
 	db.ConnectDatabase()
-
+	db.ConnectRedis()
 	server := mywebsockets.NewServer()
 
 	config := &websocket.Config{

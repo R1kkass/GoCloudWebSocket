@@ -1,6 +1,7 @@
 package mywebsockets
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +44,15 @@ func (s *Server) SendMessages(ws *websocket.Conn, user *Model.User) {
 		}
 
 		r := db.DB.Preload("User").Create(&message).First(&message)
+		
+		mapMessage := map[string]string{
+			"description": string(msg),
+			"title": "Новое сообщение",
+			"type": "New_Message",
+		}
+		objectMessage, _ := json.Marshal(mapMessage)
+		
+		db.ConnectRedisDB.LPush(context.TODO(), strconv.Itoa(int(user.ID))+":"+chatId, objectMessage)
 
 		if r.RowsAffected == 0 {
 			ws.Write([]byte("Ошибка"))
