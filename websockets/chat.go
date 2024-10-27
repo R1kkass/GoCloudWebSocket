@@ -1,7 +1,6 @@
 package mywebsockets
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,20 +44,22 @@ func (s *Server) SendMessages(ws *websocket.Conn, user *Model.User) {
 
 		r := db.DB.Preload("User").Create(&message).First(&message)
 		
-		mapMessage := map[string]string{
+		mapMessage := map[string]any{
 			"description": string(msg),
 			"title": "Новое сообщение",
 			"type": "New_Message",
+			"options": map[string]string{
+				"chat_id": chatId,
+			},
 		}
 		objectMessage, _ := json.Marshal(mapMessage)
 		
-		db.ConnectRedisDB.LPush(context.TODO(), strconv.Itoa(int(user.ID))+":"+chatId, objectMessage)
-
 		if r.RowsAffected == 0 {
 			ws.Write([]byte("Ошибка"))
 		} else {
+			go unReadedMessages(uint(chatInt), message.ID, int(user.ID))
 			jsonMessage, _ := json.Marshal(message)
-
+			go s.sendNotification(chatInt, user.ID, objectMessage)
 			s.broadcast(jsonMessage, chatId)
 		}
 	}
@@ -95,7 +96,7 @@ func (s *Server) HandleChatWs(ws *websocket.Conn) {
 
 	var messages []*Model.Message
 
-	db.DB.Model(&Model.Message{}).Preload("User").Where("chat_id=?", ws.Request().URL.Query()["id"][0]).Find(&messages)
+	db.DB.Model(&Model.Message{}).Preload("User").Where("chat_id=?", ws.Request().URL.Query()["id"][0]).Order("id DESC").Limit(10).Find(&messages)
 	messageJson, err := json.Marshal(messages)
 
 	if err != nil {
